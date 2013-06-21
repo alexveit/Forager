@@ -5,23 +5,73 @@ using System.Linq;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+using System.IO;
 using HtmlAgilityPack;
+
+
 
 namespace Forager
 {
     public partial class Default : System.Web.UI.Page
     {
-        private List<DocumentWithLinks> _dwls = new List<DocumentWithLinks>();
+        ArrayList _references = new ArrayList();
+        string _absolute_domain;
         string _domain;
+
+
+        private static bool ConstainsHTTP(string url)
+        {
+            return (url.Contains("http://") || url.Contains("https://"));
+        }
+
+        private static string GetDomain(string absolute_domain)
+        {
+            string d;
+            if (absolute_domain.Contains("http://"))
+                d = absolute_domain.Substring(7);
+            else
+                d = absolute_domain;
+
+            int index = d.Length - 1;
+
+            for (int i = 0; i < d.Length; i++)
+            {
+                if (d[i] == '/')
+                {
+                    index = i - 1;
+                }
+            }
+
+            string ret = null;
+            int dot_count = 0;
+            int len = 0;
+            for (int i = index; i >= 0; i--)
+            {
+                if (d[i] == '.')
+                {
+                    dot_count++;
+                    if (dot_count == 2)
+                    {
+                        ret = d.Substring(i + 1, len);
+                        break;
+                    }
+                }
+                len++;
+            }
+
+            return ret;
+        }
 
         private static string Get_normalized_Url(string url)
         {
-            string normalized = "http://";
-            if (normalized.Equals(url.Substring(0, 7)))
-            {
-                return url;
-            }
-            return url.Insert(0, normalized); ;
+            string ret;
+
+            if (url.Length >= 7 && ConstainsHTTP(url))
+                ret = url;
+            else
+                ret = url.Insert(0, "http://");
+
+            return ret;
         }
 
         protected void Page_Load(object sender, EventArgs e)
@@ -31,28 +81,77 @@ namespace Forager
 
         protected void Button1_Click(object sender, EventArgs e)
         {
-            _domain = TextBox1.Text + "/";
-            Get_Links(_domain);
+            try
+            {
+                _absolute_domain = Get_normalized_Url(TextBox1.Text);
+                if (_absolute_domain != null)
+                {
+                    _domain = GetDomain(_absolute_domain);
+                    Get_Links(_absolute_domain);
+                }
+            }
+            catch (Exception ex)
+            {
+                string msg = "alert('Oops... " + ex.Message + "');";
+                Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
+            }
+            finally
+            {
+                string name = Directory.GetCurrentDirectory() + "\\result.txt";
+                using (System.IO.StreamWriter file = new System.IO.StreamWriter(name))
+                {
+                    string tmp;
+                    foreach (string line in _references)
+                    {
+
+                        if (ConstainsHTTP(line))
+                            tmp = line;
+                        else
+                            tmp = line.Insert(0, _absolute_domain);
+
+                        file.WriteLine(tmp);
+                    }
+                }
+            }
         }
 
         private void Get_Links(string url)
         {
             HtmlWeb hw = new HtmlWeb();
-            string normalUrl = Get_normalized_Url(url);
-            if (normalUrl != null)
+            HtmlDocument doc = hw.Load(url);
+            DocumentWithLinks nwl = new DocumentWithLinks(doc);
+
+            for (int i = 0; i < nwl.References.Count; i++)
             {
-                HtmlDocument doc = hw.Load(normalUrl);
-
-                DocumentWithLinks nwl = new DocumentWithLinks(doc);
-
-                _dwls.Add(nwl);
-
-                for (int i = 0; i < nwl.Links.Count; i++)
+                if (!Has_Been_Visited(nwl.References[i]))
                 {
-                    string temp = _domain + nwl.References[i].ToString();
-                    Get_Links(temp);
+                    _references.Add(nwl.References[i]);
+                    string temp;
+                    if (!ConstainsHTTP(nwl.References[i].ToString()))
+                    {
+                        temp = _absolute_domain;
+                        if (nwl.References[i].ToString()[0] == '/')
+                            temp += nwl.References[i].ToString();
+                        else
+                            temp += "/" + nwl.References[i].ToString();
+                    }
+                    else
+                        temp = nwl.References[i].ToString();
+
+                    if (temp.Contains(_domain))
+                        Get_Links(temp);
                 }
             }
+        }
+
+        private bool Has_Been_Visited(object page)
+        {
+            for (int i = 0; i < _references.Count; i++)
+            {
+                if (_references[i].Equals(page))
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>

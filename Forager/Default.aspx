@@ -16,7 +16,7 @@
                 <td><asp:TextBox ID="TextBox1" runat="server" Width="200px"></asp:TextBox></td>
                 <td><asp:Button ID="Button1" runat="server" OnClick="Button1_Click" Text="Button" /></td>
             </tr>
-        </table>  
-    </form>
+        </table>
+    </form> 
 </body>
 </html>
