@@ -81,38 +81,38 @@ namespace Forager
 
         protected void Button1_Click(object sender, EventArgs e)
         {
-            try
+            _absolute_domain = Get_normalized_Url(TextBox1.Text);
+            if (_absolute_domain != null)
             {
-                _absolute_domain = Get_normalized_Url(TextBox1.Text);
-                if (_absolute_domain != null)
-                {
-                    _domain = GetDomain(_absolute_domain);
-                    Get_Links(_absolute_domain);
-                }
-            }
-            catch (Exception ex)
-            {
-                string msg = "alert('Oops... " + ex.Message + "');";
-                Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
-            }
-            finally
-            {
-                string name = Directory.GetCurrentDirectory() + "\\result.txt";
-                using (System.IO.StreamWriter file = new System.IO.StreamWriter(name))
-                {
-                    string tmp;
-                    foreach (string line in _references)
-                    {
+                _domain = GetDomain(_absolute_domain);
+                Get_Links(_absolute_domain);
 
+            }
+
+
+            string name = Directory.GetCurrentDirectory() + "\\result.txt";
+            using (System.IO.StreamWriter file = new System.IO.StreamWriter(name))
+            {
+                string tmp;
+                foreach (string line in _references)
+                {
+                    if (line.Length > 0)
+                    {
                         if (ConstainsHTTP(line))
                             tmp = line;
                         else
-                            tmp = line.Insert(0, _absolute_domain);
+                        {
+                            if(line.First().Equals('/'))
+                                tmp = line.Insert(0, _absolute_domain);
+                            else
+                                tmp = line.Insert(0, _absolute_domain + "/");
+                        }
 
                         file.WriteLine(tmp);
                     }
                 }
             }
+            
         }
 
         private void Get_Links(string url)
@@ -139,7 +139,17 @@ namespace Forager
                         temp = nwl.References[i].ToString();
 
                     if (temp.Contains(_domain))
-                        Get_Links(temp);
+                    {
+                        try
+                        {
+                            Get_Links(temp);
+                        }
+                        catch (Exception ex)
+                        {
+                            string msg = "alert('Oops... " + ex.Message + "');";
+                            Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
+                        }
+                    }
                 }
             }
         }
