@@ -1,12 +1,14 @@
-﻿using System;
+﻿using HtmlAgilityPack;
+using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
 using System.IO;
-using HtmlAgilityPack;
+using System.Linq;
+using System.Net;
+using System.Net.Mail;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Web.UI;
 
 
 
@@ -18,6 +20,17 @@ namespace Forager
         string _absolute_domain;
         string _domain;
 
+        string _path = Directory.GetCurrentDirectory() + "\\result.txt";
+        string _logpath = Directory.GetCurrentDirectory() + "\\errorlog.txt";
+
+        private void addtolog(string expt_msg)
+        {
+            string msg = "Oops... " + expt_msg;
+            using (StreamWriter sw = File.AppendText(_logpath))
+            {
+                sw.WriteLine(msg);
+            }
+        }
 
         private static bool ConstainsHTTP(string url)
         {
@@ -76,20 +89,145 @@ namespace Forager
 
         protected void Page_Load(object sender, EventArgs e)
         {
-
+            using (StreamWriter sw = File.CreateText(_path))
+            {
+                sw.WriteLine("Links:");
+            }
+            using (StreamWriter sw = File.CreateText(_logpath))
+            {
+                sw.WriteLine("Log:");
+            }
         }
 
+        //when the user clicks the button on the website this gets called
         protected void Button1_Click(object sender, EventArgs e)
         {
             _absolute_domain = Get_normalized_Url(TextBox1.Text);
             if (_absolute_domain != null)
             {
                 _domain = GetDomain(_absolute_domain);
-                Get_Links(_absolute_domain);
+                if (_domain != null)
+                {
+                    Get_Links(_absolute_domain);
 
+                    //Write_to_File();
+
+                    Send_Email();
+
+                    string msg = "alert('Successful Forage');";
+                    Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
+                }
+                else
+                {
+                    string msg = "alert('Oops... Something whent wrong with the input');";
+                    Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
+                }
             }
+            else
+            {
+                string msg = "alert('Oops... Something whent wrong with the input');";
+                Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
+            }
+        }
+
+        private void Get_Links(string url)
+        {
+            try
+            {
+                HtmlWeb hw = new HtmlWeb();
+                HtmlDocument doc = hw.Load(url);
+                DocumentWithLinks nwl = new DocumentWithLinks(doc);
+
+                for (int i = 0; i < nwl.References.Count; i++)
+                {
+                    if (!Has_Been_Visited(nwl.References[i]))
+                    {
+                        _references.Add(nwl.References[i]);
+                        using (StreamWriter sw = File.AppendText(_path))
+                        {
+                            string tmp;
+                            if (nwl.References[i].ToString().Length > 0)
+                            {
+                                if (ConstainsHTTP(nwl.References[i].ToString()))
+                                    tmp = nwl.References[i].ToString();
+                                else
+                                {
+                                    if (nwl.References[i].ToString().First().Equals('/'))
+                                        tmp = nwl.References[i].ToString().Insert(0, _absolute_domain);
+                                    else
+                                        tmp = nwl.References[i].ToString().Insert(0, _absolute_domain + "/");
+                                }
+                                sw.WriteLine(tmp);
+                            }
+                        }
+                        string temp;
+                        if (!ConstainsHTTP(nwl.References[i].ToString()))
+                        {
+                            temp = _absolute_domain;
+                            if (nwl.References[i].ToString()[0] == '/')
+                                temp += nwl.References[i].ToString();
+                            else
+                                temp += "/" + nwl.References[i].ToString();
+                        }
+                        else
+                            temp = nwl.References[i].ToString();
+
+                        if (temp.Contains(_domain))
+                        {
+                            try
+                            {
+                                Get_Links(temp);
+                            }
+                            catch (Exception ex)
+                            {
+                                addtolog(ex.Message);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (StackOverflowException ex)
+            {
+                addtolog(ex.Message);
+            }
+        }
+
+        private bool Has_Been_Visited(object page)
+        {
+            for (int i = 0; i < _references.Count; i++)
+            {
+                if (_references[i].Equals(page))
+                    return true;
+            }
+            return false;
+        }
+
+        private void Send_Email()
+        {
+            SmtpClient client = new SmtpClient();
+            client.Port = 587;
+            client.Host = "smtp.gmail.com";
+            client.EnableSsl = true;
+            client.Timeout = 10000;
+            client.DeliveryMethod = SmtpDeliveryMethod.Network;
+            client.UseDefaultCredentials = false;
+            client.Credentials = new System.Net.NetworkCredential("group2forager@gmail.com", "honeycomb");
 
 
+            MailMessage mm = new MailMessage("donotreply@domain.com", "aveit@spsu.edu", "Forager Report", "test body");
+            mm.BodyEncoding = UTF8Encoding.UTF8;
+            mm.DeliveryNotificationOptions = DeliveryNotificationOptions.OnFailure;
+
+            //add following code before smtpClient.Send()
+
+            client.EnableSsl = true;
+
+            ServicePointManager.ServerCertificateValidationCallback = delegate(object s, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) { return true; };
+            client.Send(mm);
+        }
+
+        private void Write_to_File()
+        {
             string name = Directory.GetCurrentDirectory() + "\\result.txt";
             using (System.IO.StreamWriter file = new System.IO.StreamWriter(name))
             {
@@ -102,7 +240,7 @@ namespace Forager
                             tmp = line;
                         else
                         {
-                            if(line.First().Equals('/'))
+                            if (line.First().Equals('/'))
                                 tmp = line.Insert(0, _absolute_domain);
                             else
                                 tmp = line.Insert(0, _absolute_domain + "/");
@@ -112,56 +250,6 @@ namespace Forager
                     }
                 }
             }
-            
-        }
-
-        private void Get_Links(string url)
-        {
-            HtmlWeb hw = new HtmlWeb();
-            HtmlDocument doc = hw.Load(url);
-            DocumentWithLinks nwl = new DocumentWithLinks(doc);
-
-            for (int i = 0; i < nwl.References.Count; i++)
-            {
-                if (!Has_Been_Visited(nwl.References[i]))
-                {
-                    _references.Add(nwl.References[i]);
-                    string temp;
-                    if (!ConstainsHTTP(nwl.References[i].ToString()))
-                    {
-                        temp = _absolute_domain;
-                        if (nwl.References[i].ToString()[0] == '/')
-                            temp += nwl.References[i].ToString();
-                        else
-                            temp += "/" + nwl.References[i].ToString();
-                    }
-                    else
-                        temp = nwl.References[i].ToString();
-
-                    if (temp.Contains(_domain))
-                    {
-                        try
-                        {
-                            Get_Links(temp);
-                        }
-                        catch (Exception ex)
-                        {
-                            string msg = "alert('Oops... " + ex.Message + "');";
-                            Page.ClientScript.RegisterStartupScript(GetType(), "msgbox", msg, true);
-                        }
-                    }
-                }
-            }
-        }
-
-        private bool Has_Been_Visited(object page)
-        {
-            for (int i = 0; i < _references.Count; i++)
-            {
-                if (_references[i].Equals(page))
-                    return true;
-            }
-            return false;
         }
 
         /// <summary>
