@@ -10,8 +10,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Web.UI;
 
-
-
 namespace Forager
 {
     public partial class Default : System.Web.UI.Page
@@ -108,6 +106,7 @@ namespace Forager
                 _domain = GetDomain(_absolute_domain);
                 if (_domain != null)
                 {
+
                     Get_Links(_absolute_domain);
 
                     //Write_to_File();
@@ -130,7 +129,7 @@ namespace Forager
             }
         }
 
-        private void Get_Links(string url)
+        bool Get_Links(string url)
         {
             try
             {
@@ -140,7 +139,7 @@ namespace Forager
 
                 for (int i = 0; i < nwl.References.Count; i++)
                 {
-                    if (!Has_Been_Visited(nwl.References[i]))
+                    if (!_references.Contains(nwl.References[i]))
                     {
                         _references.Add(nwl.References[i]);
                         using (StreamWriter sw = File.AppendText(_path))
@@ -190,16 +189,7 @@ namespace Forager
             {
                 addtolog(ex.Message);
             }
-        }
-
-        private bool Has_Been_Visited(object page)
-        {
-            for (int i = 0; i < _references.Count; i++)
-            {
-                if (_references[i].Equals(page))
-                    return true;
-            }
-            return false;
+            return true;
         }
 
         private void Send_Email()
