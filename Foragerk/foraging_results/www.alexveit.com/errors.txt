@@ -1,0 +1,2 @@
+link	error
+0	" Failed links"

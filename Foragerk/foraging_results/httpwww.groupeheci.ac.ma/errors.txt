@@ -1,0 +1,3 @@
+link																		error
+"http://www.groupeheci.ac.ma/index.php/notre-reseau?id=5:option-marketing&amp;catid=16:master"							"The remote server returned an error: (404) Not Found."
+"http://www.groupeheci.ac.ma/index.php/notre-reseau/heci-reseau-maroc?id=6:option-ingenierie-et-management-de-projet&amp;catid=16:master" 	"The remote server returned an error: (404) Not Found."
